@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: "Film Personality Analyzer",
-  description: "Cek MBTI dan Vibe Sinematik berdasarkan film favoritmu",
+  title: "Ngelantur AI - Bedah Kepribadian Lewat Film Favorit",
+  description: "Bongkar MBTI, Red Flag, hingga Green Flag kamu berdasarkan pilihan film favorit menggunakan Ngelantur AI.",
+  icons: {
+    icon: "/public/ngelantur.jpg", // Letakkan berkas favicon.ico di folder public/ atau app/
+  },
 };
 
 export default function RootLayout({
@@ -15,11 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" suppressHydrationWarning>
-      <body 
-        className={`${inter.className} bg-slate-900 text-slate-100 min-h-screen antialiased`}
-        suppressHydrationWarning
-      >
+    <html lang="id">
+      <body className="bg-slate-950 text-slate-100 min-h-screen antialiased">
         {children}
       </body>
     </html>
