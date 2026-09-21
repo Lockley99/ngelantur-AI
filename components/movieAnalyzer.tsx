@@ -395,13 +395,13 @@ function AnalysisResults({ data }: { data: AnalysisData }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TraitCard
           type="red"
-          title="Red Flag / Roasting"
+          title="Red Flag"
           icon={<AlertTriangle className="w-5 h-5 shrink-0" />}
           content={data.red_flag}
         />
         <TraitCard
           type="green"
-          title="Green Flag / Kelebihan"
+          title="Green Flag"
           icon={<CheckCircle2 className="w-5 h-5 shrink-0" />}
           content={data.green_flag}
         />
