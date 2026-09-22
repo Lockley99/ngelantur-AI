@@ -32,7 +32,7 @@ async function generateContentWithRotationAndRetry(prompt: string, maxRetries = 
       console.log(`[Ngelantur AI] Menjalankan permintaan dengan API Key acak (Percobaan ke-${attempt + 1})`);
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.6-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
