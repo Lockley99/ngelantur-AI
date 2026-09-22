@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 
-// 1. Ambil semua API Key yang tersedia dari environment variables
+// 1. Ambil semua API Key yang tersedia
 const apiKeys = [
   process.env.GEMINI_API_KEY_1,
   process.env.GEMINI_API_KEY_2,
@@ -10,52 +10,52 @@ const apiKeys = [
   process.env.GEMINI_API_KEY_5,
 ].filter(Boolean) as string[];
 
-// Fungsi untuk memilih API Key secara acak
-function getRandomApiKey(): string {
+// 2. Fungsi Eksekusi Bergantian (Round-Robin)
+async function generateContentWithRotationAndRetry(prompt: string) {
   if (apiKeys.length === 0) {
     throw new Error("Tidak ada GEMINI_API_KEY yang terkonfigurasi di Environment Variables.");
   }
-  const randomIndex = Math.floor(Math.random() * apiKeys.length);
-  return apiKeys[randomIndex];
-}
 
-// 2. Fungsi eksekusi AI dengan rotasi API Key & Retry Mechanism
-async function generateContentWithRotationAndRetry(prompt: string, maxRetries = 3) {
-  let delay = 1000; // Mulai jeda 1 detik
+  let lastError: any = null;
+  let delay = 1000;
 
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
+  // Mencoba setiap API Key satu per satu secara berurutan
+  for (let i = 0; i < apiKeys.length; i++) {
+    const selectedApiKey = apiKeys[i];
+    const ai = new GoogleGenAI({ apiKey: selectedApiKey });
+
     try {
-      // Pilih API Key acak untuk setiap percobaan
-      const selectedApiKey = getRandomApiKey();
-      const ai = new GoogleGenAI({ apiKey: selectedApiKey });
-
-      console.log(`[Ngelantur AI] Menjalankan permintaan dengan API Key acak (Percobaan ke-${attempt + 1})`);
+      console.log(`[Ngelantur AI] Menjalankan permintaan dengan API Key #${i + 1}`);
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-3.6-flash", // Menggunakan model resmi dengan kuota normal
         contents: prompt,
         config: {
           responseMimeType: "application/json",
         },
       });
 
-      return response;
+      return response; // Berhasil! Kembalikan hasil
     } catch (error: any) {
+      lastError = error;
       const isRateLimited = error?.status === 429 || error?.message?.includes("429");
       const isUnavailable = error?.status === 503 || error?.message?.includes("503");
 
-      // Jika terkena Limit (429) atau Server Sibuk (503), coba ulang dengan API Key acak lainnya
-      if ((isRateLimited || isUnavailable) && attempt < maxRetries - 1) {
+      if (isRateLimited || isUnavailable) {
         console.warn(
-          `[Ngelantur AI] API Key terkena limit/sibuk (Status: ${error?.status || 'Unknown'}). Mencoba ulang dalam ${delay}ms...`
+          `[Ngelantur AI] API Key #${i + 1} terkena limit/sibuk (${error?.status || 429}). Berpindah ke API Key berikutnya...`
         );
+        // Jeda sebentar sebelum berpindah ke key berikutnya
         await new Promise((resolve) => setTimeout(resolve, delay));
-        delay *= 2; // Gandakan jeda waktu (1s -> 2s -> 4s)
       } else {
+        // Jika error bukan karena limit (misal kesalahan prompt/format), lempar error langsung
         throw error;
       }
     }
   }
+
+  // Jika semua API Key habis dan tetap gagal
+  throw lastError;
 }
 
 // 3. Handler Utama API POST
@@ -84,7 +84,7 @@ Berdasarkan pilihan film tersebut, buatlah analisis kepribadian dalam format JSO
   "archetype": "Gelar unik persona sinematik (contoh: Sang Pemimpi Filosofis)",
   "summary": "Penjelasan ringkas kepribadian mereka berdasarkan tema film.",
   "green_flag": "Sisi positif atau kelebihan mereka dalam hubungan/sosial.",
-  "red_flag": "Roasting ringan atau sisi negatif dari pilihan film meeka.",
+  "red_flag": "Roasting ringan atau sisi negatif dari pilihan film mereka.",
   "recommended_genre": "Rekomendasi genre film lain yang cocok untuk mereka."
 }
 Gunakan bahasa Indonesia yang santai, ala anak muda, dan seru khas Ngelantur AI.
@@ -105,7 +105,7 @@ Gunakan bahasa Indonesia yang santai, ala anak muda, dan seru khas Ngelantur AI.
 
     if (error?.status === 429 || error?.message?.includes("429")) {
       return NextResponse.json(
-        { error: "Semua API Key sedang mencapai kuota limit harian/menit. Silakan coba beberapa saat lagi." },
+        { error: "Semua API Key sedang mencapai kuota limit. Silakan coba 1 menit lagi." },
         { status: 429 }
       );
     }
