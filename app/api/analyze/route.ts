@@ -11,7 +11,7 @@ const apiKeys = [
 ].filter(Boolean) as string[];
 
 // 2. Fungsi Eksekusi Bergantian (Round-Robin)
-async function generateContentWithRotationAndRetry(prompt: string) {
+async function generateContent(prompt: string) {
   if (apiKeys.length === 0) {
     throw new Error("Tidak ada GEMINI_API_KEY yang terkonfigurasi di Environment Variables.");
   }
@@ -90,7 +90,7 @@ Berdasarkan pilihan film tersebut, buatlah analisis kepribadian dalam format JSO
 Gunakan bahasa Indonesia yang santai, ala anak muda, dan seru khas Ngelantur AI.
 `;
 
-    const response = await generateContentWithRotationAndRetry(prompt);
+    const response = await generateContent(prompt);
     const textResult = response?.text;
 
     if (!textResult) {

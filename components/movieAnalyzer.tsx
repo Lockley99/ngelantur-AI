@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { 
   Clapperboard, 
   Sparkles, 
@@ -32,22 +33,40 @@ export interface AnalysisData {
   recommended_genre: string;
 }
 
-export default function MovieAnalyzer() {
-  const [isMounted, setIsMounted] = useState(false);
+const UI_TEXT = {
+  title: "Bedah Kepribadian Bersama",
+  subTitle: "Pilih hingga 5 film favoritmu dari TMDB, lalu biarkan Ngelantur AI membongkar MBTI, Red Flag, hingga Green Flag kamu.",
+  placeholder: "Cari & pilih film (misal: Interstellar, Joker)...",
+  selectedMovies: "Film Pilihanmu",
+  clearAll: "Hapus Semua",
+  emptyList: "Belum ada film yang dipilih. Ketik nama film di kolom pencarian di atas!",
+  btnAnalyzing: "Ngelantur AI Sedang Menganalisis...",
+  btnAction: "Ngelantur AI, Bedah Film Gue!",
+  errMax: "Maksimal 5 film favorit saja ya!",
+  errExist: "Film ini sudah ada di daftar pilihanmu!",
+  errEmpty: "Pilih minimal 1 film favoritmu!",
+  resultsHeader: "Hasil Bedah Ngelantur AI",
+  personaBadge: "Persona Sinematik Ngelantur AI",
+  redFlagTitle: "Red Flag / Roasting",
+  greenFlagTitle: "Green Flag / Kelebihan",
+  recGenre: "Rekomendasi Genre Film",
+};
 
-  const [searchQuery, setSearchQuery] = useState("");
+export default function MovieAnalyzer() {
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
+
   const [selectedMovies, setSelectedMovies] = useState<Movie[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Pastikan komponen sudah terpasang di Client
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -60,10 +79,18 @@ export default function MovieAnalyzer() {
         try {
           const res = await fetch(`/api/tmdb/search?query=${encodeURIComponent(searchQuery)}`);
           const data = await res.json();
-          setSearchResults(data.results || []);
-          setShowDropdown(true);
-        } catch {
+          
+          if (data.results && data.results.length > 0) {
+            setSearchResults(data.results);
+            setShowDropdown(true);
+          } else {
+            setSearchResults([]);
+            setShowDropdown(false);
+          }
+        } catch (err) {
+          console.error("Gagal melakukan pencarian:", err);
           setSearchResults([]);
+          setShowDropdown(false);
         } finally {
           setIsSearching(false);
         }
@@ -76,7 +103,7 @@ export default function MovieAnalyzer() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Sembunyikan dropdown jika klik di luar area
+  // Sembunyikan dropdown saat klik di luar area input
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -87,14 +114,14 @@ export default function MovieAnalyzer() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectMovie = (movie: Movie) => {
+  const handleSelectMovie = useCallback((movie: Movie) => {
     if (selectedMovies.some((m) => m.id === movie.id)) {
-      setError("Film ini sudah ada di daftar pilihanmu!");
+      setError(UI_TEXT.errExist);
       return;
     }
 
     if (selectedMovies.length >= 5) {
-      setError("Maksimal 5 film favorit saja ya!");
+      setError(UI_TEXT.errMax);
       return;
     }
 
@@ -102,15 +129,20 @@ export default function MovieAnalyzer() {
     setSearchQuery("");
     setShowDropdown(false);
     setError(null);
-  };
+  }, [selectedMovies]);
 
-  const handleRemoveMovie = (id: number) => {
+  const handleRemoveMovie = useCallback((id: number) => {
     setSelectedMovies((prev) => prev.filter((m) => m.id !== id));
-  };
+  }, []);
+
+  const handleClearMovies = useCallback(() => {
+    setSelectedMovies([]);
+    setError(null);
+  }, []);
 
   const handleAnalyze = async () => {
     if (selectedMovies.length === 0) {
-      setError("Pilih minimal 1 film favoritmu!");
+      setError(UI_TEXT.errEmpty);
       return;
     }
 
@@ -125,7 +157,7 @@ export default function MovieAnalyzer() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal menganalisis");
+      if (!res.ok) throw new Error(data.error || "Gagal melakukan analisis.");
 
       setAnalysis(data.analysis);
     } catch (err: unknown) {
@@ -137,13 +169,12 @@ export default function MovieAnalyzer() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10">
+    <div className="max-w-4xl mx-auto space-y-8 relative">
       <HeaderSection />
 
-      {/* Box Input & Pilihan Film */}
+      {/* Form Input & List Film */}
       <section className="bg-slate-800/90 backdrop-blur-md border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
         
-        {/* Input Auto-complete */}
         <div className="relative" ref={dropdownRef}>
           <div className="relative flex-1">
             <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -151,8 +182,8 @@ export default function MovieAnalyzer() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery.length >= 2 && setShowDropdown(true)}
-              placeholder="Cari & pilih film (misal: Interstellar, Joker)..."
+              onFocus={() => searchQuery.trim().length >= 2 && searchResults.length > 0 && setShowDropdown(true)}
+              placeholder={UI_TEXT.placeholder}
               className="w-full pl-11 pr-10 py-3.5 bg-slate-900/90 rounded-2xl border border-slate-700 text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all placeholder:text-slate-500"
             />
             {isSearching && (
@@ -160,7 +191,7 @@ export default function MovieAnalyzer() {
             )}
           </div>
 
-          {/* Menu Dropdown Hasil Pencarian TMDB */}
+          {/* Dropdown Hasil Pencarian TMDB */}
           {showDropdown && searchResults.length > 0 && (
             <div className="absolute left-0 right-0 top-full mt-2 bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl max-h-80 overflow-y-auto z-50 divide-y divide-slate-800/80">
               {searchResults.map((movie) => {
@@ -210,25 +241,22 @@ export default function MovieAnalyzer() {
 
         {error && <ErrorMessage message={error} />}
 
-        {/* Grid Kartu Pilihan Film */}
         <SelectedMoviesGrid 
           movies={selectedMovies} 
           onRemove={handleRemoveMovie} 
-          onClear={() => setSelectedMovies([])} 
+          onClear={handleClearMovies} 
         />
 
-        {/* --- Tombol Eksekusi Analisis (Dua Jalur untuk Memutus Mismatch) --- */}
+        {/* Tombol Bedah Film */}
         {!isMounted ? (
-          /* Tampilan Statis untuk Server Rendering / Hydration Awal */
           <button
-            disabled={true}
+            disabled
             className="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-sm sm:text-base rounded-2xl opacity-40 cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Sparkles className="w-5 h-5" />
-            <span>Analisis Vibe Film Gue</span>
+            <span>{UI_TEXT.btnAnalyzing}</span>
           </button>
         ) : (
-          /* Tampilan Dinamis Setelah Terpasang di Client */
           <button
             onClick={handleAnalyze}
             disabled={isLoading || selectedMovies.length === 0}
@@ -237,25 +265,71 @@ export default function MovieAnalyzer() {
             {isLoading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Menganalisis Kepribadian...</span>
+                <span>{UI_TEXT.btnAnalyzing}</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-5 h-5" />
-                <span>Analisis Vibe Film Gue</span>
+                <span>{UI_TEXT.btnAction}</span>
               </>
             )}
           </button>
         )}
       </section>
 
-      {/* Hasil Analisis AI */}
+      {/* Hasil Analisis */}
       {analysis && <AnalysisResults data={analysis} />}
+
+      {/* Footer */}
+      <footer className="pt-6 pb-2 text-center flex justify-center items-center">
+        <div className="px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-800/80 text-xs text-slate-400 shadow-inner">
+          Made by{" "}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 font-bold ml-0.5">
+            Sir Ami
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
 
-// --- Sub-komponen Tampilan ---
+// --- Sub-Components ---
+
+function HeaderSection() {
+  const [imageError, setImageError] = useState(false);
+
+  return (
+    <header className="text-center space-y-3">
+      {!imageError && (
+        <div className="flex justify-center mb-2">
+          <Image
+            src="/logo.png"
+            alt="Logo Ngelantur AI"
+            width={80}
+            height={80}
+            className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md"
+            priority
+            onError={() => setImageError(true)}
+          />
+        </div>
+      )}
+
+      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-800/60 text-indigo-300 text-xs sm:text-sm font-semibold shadow-inner">
+        <Clapperboard className="w-4 h-4 text-indigo-400" />
+        <span>Ngelantur AI</span>
+      </div>
+      <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+        {UI_TEXT.title}{" "}
+        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+          Ngelantur AI
+        </span>
+      </h1>
+      <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
+        {UI_TEXT.subTitle}
+      </p>
+    </header>
+  );
+}
 
 function SelectedMoviesGrid({ 
   movies, 
@@ -269,17 +343,17 @@ function SelectedMoviesGrid({
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center text-xs text-slate-400 font-semibold uppercase tracking-wider">
-        <span>Film Pilihanmu ({movies.length}/5)</span>
+        <span>{UI_TEXT.selectedMovies} ({movies.length}/5)</span>
         {movies.length > 0 && (
           <button onClick={onClear} className="text-rose-400 hover:text-rose-300 hover:underline">
-            Hapus Semua
+            {UI_TEXT.clearAll}
           </button>
         )}
       </div>
 
       {movies.length === 0 ? (
         <div className="text-center py-10 border-2 border-dashed border-slate-700/80 rounded-2xl text-slate-500 text-xs sm:text-sm">
-          Belum ada film yang dipilih. Ketik nama film di kolom pencarian di atas!
+          {UI_TEXT.emptyList}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -322,7 +396,6 @@ function SelectedMoviesGrid({
                 <button
                   onClick={() => onRemove(movie.id)}
                   className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition-all"
-                  title="Hapus film"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -332,26 +405,6 @@ function SelectedMoviesGrid({
         </div>
       )}
     </div>
-  );
-}
-
-function HeaderSection() {
-  return (
-    <header className="text-center space-y-3">
-      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-950/80 border border-indigo-800/60 text-indigo-300 text-xs sm:text-sm font-semibold shadow-inner">
-        <Clapperboard className="w-4 h-4 text-indigo-400" />
-        <span>AI Film Personality Detector</span>
-      </div>
-      <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-        Bedah Kepribadian Lewat{" "}
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-          Film Favorit
-        </span>
-      </h1>
-      <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
-        Pilih hingga 5 film favoritmu dari TMDB, lalu biarkan AI membongkar MBTI, Red Flag, hingga Green Flag kamu.
-      </p>
-    </header>
   );
 }
 
@@ -371,7 +424,7 @@ function AnalysisResults({ data }: { data: AnalysisData }) {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white backdrop-blur-md border border-white/20">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            Persona Sinematik
+            {UI_TEXT.personaBadge}
           </span>
           <span className="text-xs font-mono font-bold tracking-wider bg-slate-900 text-indigo-300 px-3 py-1 rounded-full shadow-md border border-indigo-500/30">
             {data.mbti}
@@ -385,7 +438,7 @@ function AnalysisResults({ data }: { data: AnalysisData }) {
       <div className="rounded-3xl bg-slate-800/90 border border-slate-700/80 p-6 sm:p-8 shadow-xl">
         <div className="flex items-center gap-2.5 mb-4 text-indigo-400 font-bold text-base sm:text-lg border-b border-slate-700/60 pb-3">
           <Clapperboard className="w-5 h-5" />
-          <h3>Bedah Kepribadian</h3>
+          <h3>{UI_TEXT.resultsHeader}</h3>
         </div>
         <p className="text-slate-300 leading-relaxed text-sm sm:text-base whitespace-pre-line">
           {data.summary}
@@ -395,13 +448,13 @@ function AnalysisResults({ data }: { data: AnalysisData }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TraitCard
           type="red"
-          title="Red Flag"
+          title={UI_TEXT.redFlagTitle}
           icon={<AlertTriangle className="w-5 h-5 shrink-0" />}
           content={data.red_flag}
         />
         <TraitCard
           type="green"
-          title="Green Flag"
+          title={UI_TEXT.greenFlagTitle}
           icon={<CheckCircle2 className="w-5 h-5 shrink-0" />}
           content={data.green_flag}
         />
@@ -413,7 +466,7 @@ function AnalysisResults({ data }: { data: AnalysisData }) {
         </div>
         <div>
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-            Rekomendasi Genre Film
+            {UI_TEXT.recGenre}
           </span>
           <h4 className="text-base sm:text-lg font-bold text-white mt-0.5">
             {data.recommended_genre}
