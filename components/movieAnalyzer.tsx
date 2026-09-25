@@ -47,8 +47,8 @@ const UI_TEXT = {
   errEmpty: "Pilih minimal 1 film favoritmu!",
   resultsHeader: "Hasil Bedah Ngelantur AI",
   personaBadge: "Persona Sinematik Ngelantur AI",
-  redFlagTitle: "Red Flag / Roasting",
-  greenFlagTitle: "Green Flag / Kelebihan",
+  redFlagTitle: "Red Flag",
+  greenFlagTitle: "Green Flag",
   recGenre: "Rekomendasi Genre Film",
 };
 
